@@ -9,7 +9,7 @@ module ParserLexer
   ( parseExpr
   , typeCheck
   , evaluate
-  , stripAnnotation
+  , ATExpr ((:::))
   ) where
 
 -- parser / lexer
@@ -88,22 +88,22 @@ pEList = EList <$> pParens (pCommaSep pExpr)
 -- type checker
 
 data TExpr a where
-    TExprNumber :: Integer       -> TExpr Integer
-    TExprString :: String        -> TExpr String
-    TExprList   :: [TExpr b]     -> TExpr b
-    TExprSum    :: TExpr Integer -> TExpr Integer
+    TExprNumber :: Integer         -> TExpr Integer
+    TExprString :: String          -> TExpr String
+    TExprList   :: [TExpr b]       -> TExpr [b]
+    TExprSum    :: TExpr [Integer] -> TExpr Integer
 
 deriving instance Show (TExpr a)
 
 data TType a where
     TTypeNumber     :: TType Integer
     TTypeString     :: TType String
-    TTypeNumberList :: TType Integer
-    TTypeStringList :: TType String
+    TTypeNumberList :: TType [Integer]
+    TTypeStringList :: TType [String]
 
 deriving instance Show (TType a)
 
-data ATExpr = forall a. TExpr a ::: TType a
+data ATExpr = forall a. Show a => TExpr a ::: TType a
 
 deriving instance Show ATExpr
 
@@ -132,21 +132,8 @@ typeCheck (ESum    e) = typeCheck e >>= \case
 
 -- evaluation
 
-newtype SafeExpr = SafeExpr Expr
-
-stripAnnotation :: ATExpr -> SafeExpr
-stripAnnotation (te ::: _) = SafeExpr $ toExpr te
-  where
-    toExpr :: TExpr a -> Expr
-    toExpr (TExprNumber x) = ENumber x
-    toExpr (TExprString x) = EString x
-    toExpr (TExprList   l) = EList $ map toExpr l
-    toExpr (TExprSum    e) = ESum $ toExpr e
-
-
-evaluate :: MonadError String m => SafeExpr -> m Expr
-evaluate (SafeExpr (ESum (EList ls))) = ENumber <$> foldM acc 0 ls
-  where
-    acc x (ENumber y) = pure $ x + y
-    acc _ _           = throwError "Sum of something other than ENumber"
-evaluate (SafeExpr x) = pure x
+evaluate :: TExpr a -> a
+evaluate (TExprNumber x)  = x
+evaluate (TExprString s)  = s
+evaluate (TExprList   ls) = map evaluate ls
+evaluate (TExprSum    xs) = sum $ evaluate xs

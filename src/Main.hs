@@ -7,7 +7,7 @@ import           Control.Monad.Except (runExcept, throwError)
 import           Data.Monoid          ((<>))
 
 -- import SimpleParser (parseExpr)
-import           ParserLexer          (stripAnnotation, evaluate, parseExpr,
+import           ParserLexer          (ATExpr ((:::)), evaluate, parseExpr,
                                        typeCheck)
 
 main :: IO ()
@@ -16,10 +16,9 @@ main = do
     unless (null input) $ do
         -- print $ parseExpr input
         let result = runExcept $ do
-                expr   <- either mkParseError pure $ parseExpr input
-                atExpr <- either mkTypeError  pure $ typeCheck expr
-                let safeExpr = stripAnnotation atExpr
-                eval   <- either mkEvalError  pure $ evaluate safeExpr -- cannot fail
+                expr       <- either mkParseError pure $ parseExpr input
+                (te ::: _) <- either mkTypeError  pure $ typeCheck expr
+                let eval = show $ evaluate te -- cannot fail
                 pure eval
         case result of
             Left  err -> putStrLn err
